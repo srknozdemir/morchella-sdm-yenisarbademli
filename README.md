@@ -1,6 +1,6 @@
 # Fine-scale habitat modelling of *Morchella esculenta* s.l. in Yenişarbademli (Isparta, Türkiye)
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23861480.svg)](https://doi.org/10.5281/zenodo.23861480)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23861479.svg)](https://doi.org/10.5281/zenodo.23861479)
 
 Code and outputs for the manuscript:
 
@@ -53,6 +53,8 @@ The exact locations of harvested morel stands are commercially sensitive for loc
 Please cite the article and this repository:
 
 > Kaya, C., Özdemir, S., Aday Kaya, A.G., 2026. morchella-sdm-yenisarbademli: fine-scale habitat modelling of *Morchella esculenta* s.l. in south-western Anatolia (v1.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23861480
+
+The DOI above refers to version 1.0.0, the version used in the article. To cite all versions, use https://doi.org/10.5281/zenodo.23861479.
 
 ## Licence
 
