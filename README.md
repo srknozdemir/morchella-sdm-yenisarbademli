@@ -1,5 +1,7 @@
 # Fine-scale habitat modelling of *Morchella esculenta* s.l. in Yenişarbademli (Isparta, Türkiye)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23861480.svg)](https://doi.org/10.5281/zenodo.23861480)
+
 Code and outputs for the manuscript:
 
 > Kaya, C., Özdemir, S., & Aday Kaya, A. G. Soil and canopy define the habitat of the yellow morel (*Morchella esculenta* s.l.) but do not buffer its projected decline under climate change. *In preparation.*
@@ -48,7 +50,9 @@ The exact locations of harvested morel stands are commercially sensitive for loc
 
 ## Citation
 
-Please cite the article and this repository (see `CITATION.cff`). The software DOI is assigned by Zenodo on release.
+Please cite the article and this repository:
+
+> Kaya, C., Özdemir, S., Aday Kaya, A.G., 2026. morchella-sdm-yenisarbademli: fine-scale habitat modelling of *Morchella esculenta* s.l. in south-western Anatolia (v1.0.0) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23861480
 
 ## Licence
 
