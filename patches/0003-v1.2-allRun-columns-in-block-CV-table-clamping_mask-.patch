@@ -1,0 +1,81 @@
+From 7b5f5bb7b74de693fb169ba25ade64eed00b2586 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 19:48:42 +0300
+Subject: [PATCH 3/3] v1.2: allRun columns in block CV table; clamping_mask,
+ terra_memfrac, skip_projection options
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01G2GG4boqzjcLUzZ6wQWkMG
+---
+ run_biomod.R | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/run_biomod.R b/run_biomod.R
+index 1111710..278406d 100644
+--- a/run_biomod.R
++++ b/run_biomod.R
+@@ -171,6 +171,8 @@ if (!requireNamespace("R.utils", quietly = TRUE)) {
+   install.packages("R.utils", repos = "https://cloud.r-project.org")
+ }
+ suppressPackageStartupMessages(library(R.utils))
++# Buyuk izgaralarda bellek: terra'nin kullanacagi RAM payi (v1.2, cfg$terra_memfrac)
++try(terra::terraOptions(memfrac = as.numeric(cfg$terra_memfrac %||% 0.5)), silent = TRUE)
+ 
+ # -------------------- PAYLASILAN SECENEK MOTORU --------------------
+ # Literatur temelli parametre izgarasi run_biomod_cont.R ile ORTAKTIR.
+@@ -694,6 +696,11 @@ block_cv_table <- function(bf) {
+     m <- matrix(NA, nrow = length(sp), ncol = 4)
+     for (k in 1:4) { m[ind[s == 1], k] <- b$p != k; m[ind[s == 0], k] <- b$o != k }
+     colnames(m) <- if (inherits(bf, "BIOMOD.formated.data.PA")) paste0("_PA", pa, "_RUN", 1:4) else paste0("_allData_RUN", 1:4)
++    if (isTRUE(cfg$project_full_models)) {             # tam veri modeli (her PA seti icin)
++      full <- matrix(NA, nrow = length(sp), ncol = 1); full[ind, 1] <- TRUE
++      colnames(full) <- if (inherits(bf, "BIOMOD.formated.data.PA")) paste0("_PA", pa, "_allRun") else "_allData_allRun"
++      m <- cbind(m, full)
++    }
+     out <- cbind(out, m)
+   }
+   out
+@@ -719,7 +726,7 @@ mod_args <- list(
+   nb.cpu      = nb_cpu,
+   do.progress = TRUE
+ )
+-if (isTRUE(cfg$project_full_models)) mod_args$CV.do.full.models <- TRUE
++if (isTRUE(cfg$project_full_models) && cv_strategy != "block") mod_args$CV.do.full.models <- TRUE
+ mod_args <- bmopt_inject(mod_args, built_opts)
+ 
+ model_out <- tryCatch(do.call(BIOMOD_Modeling, mod_args), error = function(e) e)
+@@ -1488,13 +1495,21 @@ load_env_asc <- function(asc_dir, ref_names = NULL) {
+   e
+ }
+ 
++# Projeksiyon disarida yapilacaksa (v1.2, cfg$skip_projection): kalibrasyon, degerlendirme,
++# ansambl ve tepki egrileri tamamlandi; model nesneleri biomod2 klasorunde kayitli.
++if (isTRUE(cfg$skip_projection)) {
++  set_status("DONE (models only; projection skipped)")
++  message("skip_projection = TRUE: projection skipped.")
++  quit(save = "no", status = 0)
++}
++
+ proj_cur <- BIOMOD_Projection(
+   bm.mod  = model_out,
+   new.env = env,
+   proj.name = "current",
+   models.chosen = proj_models,
+   compress = "xz",
+-  build.clamping.mask = TRUE
++  build.clamping.mask = !isFALSE(cfg$clamping_mask)
+ )
+ 
+ ens_cur <- tryCatch({
+@@ -1588,7 +1603,7 @@ if (!do_future) {
+         proj.name = proj_name,
+         models.chosen = proj_models,
+         compress = "xz",
+-        build.clamping.mask = TRUE
++        build.clamping.mask = !isFALSE(cfg$clamping_mask)
+       )
+ 
+       ens_f <- tryCatch({
+-- 
+2.43.0
+

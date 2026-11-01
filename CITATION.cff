@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it as below."
+title: "morchella-sdm-yenisarbademli: fine-scale habitat modelling of Morchella esculenta s.l. in south-western Anatolia"
+version: 1.0.0
+date-released: 2026-11-01
+license: MIT
+repository-code: "https://github.com/srknozdemir/morchella-sdm-yenisarbademli"
+authors:
+  - family-names: "Kaya"
+    given-names: "Canpolat"
+    affiliation: "Isparta University of Applied Sciences"
+  - family-names: "Özdemir"
+    given-names: "Serkan"
+    affiliation: "Isparta University of Applied Sciences"
+    email: "serkanozdemir@isparta.edu.tr"
+  - family-names: "Aday Kaya"
+    given-names: "Ayşe Gülden"
+    affiliation: "Isparta University of Applied Sciences"
+keywords:
+  - Morchella
+  - species distribution modelling
+  - biomod2
+  - microrefugia
+  - CMIP6

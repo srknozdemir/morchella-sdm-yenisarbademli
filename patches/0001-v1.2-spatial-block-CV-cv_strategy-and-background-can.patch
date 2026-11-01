@@ -1,0 +1,141 @@
+From 9b55fa1965c7b60d937636885f96ce89358c444d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 31 Oct 2026 12:49:40 +0300
+Subject: [PATCH 1/3] v1.2: spatial block CV (cv_strategy) and background
+ candidates for pseudo-absences (bg_file)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01G2GG4boqzjcLUzZ6wQWkMG
+---
+ run_biomod.R | 77 ++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 69 insertions(+), 8 deletions(-)
+
+diff --git a/run_biomod.R b/run_biomod.R
+index 76b40d3..e89135c 100644
+--- a/run_biomod.R
++++ b/run_biomod.R
+@@ -515,6 +515,22 @@ if (use_real_abs) {
+   resp <- rep(1, nrow(occ_xy))
+ }
+ 
++# -------------------- ARKA PLAN ADAYLARI (opsiyonel, v1.2) --------------------
++# cfg$bg_file: x,y sutunlu CSV. Bu noktalar yanit degiskenine NA olarak eklenir;
++# biomod2 bu durumda sozde-yokluklari YALNIZ bu adaylar arasindan secer. Boylece
++# ornekleme yanliligina gore agirliklandirilmis arka plan kullanilabilir
++# (Phillips et al. 2009).
++bg_file <- as.character(cfg$bg_file %||% "")[1]
++use_bg  <- nzchar(bg_file) && file.exists(bg_file)
++if (use_bg) {
++  bg  <- read_user_csv(bg_file)
++  bxy <- get_xy_matrix(bg, NULL, NULL, what = "Background CSV")
++  bxy <- bxy[is.finite(bxy[, 1]) & is.finite(bxy[, 2]), , drop = FALSE]
++  occ_xy <- rbind(occ_xy, bxy)
++  resp   <- c(resp, rep(NA_integer_, nrow(bxy)))
++  message("Background candidates for pseudo-absences: ", nrow(bxy), " (", basename(bg_file), ")")
++}
++
+ set_status("LOADING DATA: extracting predictor values at occurrences")
+ v1 <- terra::extract(env[[1]], occ_xy)
+ keep <- !is.na(v1[[1]])
+@@ -522,15 +538,15 @@ occ_xy <- occ_xy[keep, , drop = FALSE]
+ resp <- resp[keep]
+ stopifnot(nrow(occ_xy) > 5)
+ 
+-n_pres <- sum(resp == 1L)
+-n_abs  <- sum(resp == 0L)
++n_pres <- sum(resp == 1L, na.rm = TRUE)
++n_abs  <- sum(resp == 0L, na.rm = TRUE)
+ 
+ # PA gerekli mi?
+ #  - Gercek yokluk yoksa      -> PA zorunlu (eski davranis)
+ #  - Gercek yokluk CV katindan azsa -> PA ile takviye edilir; aksi halde
+ #    10 katli CV'de katlarin cogu yokluksuz kalir ve TSS/AUC hesaplanamaz.
+ CV_K <- 10L
+-need_pa <- (!use_real_abs) || (n_abs < CV_K)
++need_pa <- (!use_real_abs) || (n_abs < CV_K) || use_bg
+ if (use_real_abs) {
+   message("Absence strategy: ",
+           if (need_pa) paste0("real + pseudo-absence (only ", n_abs,
+@@ -572,7 +588,12 @@ if (inherits(biomod_data, "error") && need_pa && use_real_abs) {
+ if (inherits(biomod_data, "error")) stop(conditionMessage(biomod_data))
+ 
+ # -------------------- MODELING --------------------
+-set_status("MODELING (10-fold CV)")
++# Capraz dogrulama stratejisi (v1.2): "kfold" (varsayilan), "block" (Muscarella et al.
++# 2014 enlem/boylam bloklari, 4 kat) ya da "env" (cevresel katmanlar, cfg$cv_k kat)
++cv_strategy <- tolower(as.character(cfg$cv_strategy %||% "kfold")[1])
++if (!cv_strategy %in% c("kfold", "block", "env")) cv_strategy <- "kfold"
++cv_k <- as.integer(cfg$cv_k %||% 10L)
++set_status(paste0("MODELING (CV: ", cv_strategy, ")"))
+ 
+ models_to_run <- cfg$models
+ if (is.null(models_to_run) || length(models_to_run) == 0) stop("cfg$models is empty.")
+@@ -625,7 +646,7 @@ if (!is.null(cfg$cpu_n) && is.numeric(cfg$cpu_n) && cfg$cpu_n >= 1) {
+ 
+ # ---- LITERATUR TEMELLI MODELLEME SECENEKLERI ----
+ p_env  <- terra::nlyr(env)
+-n_pres <- nrow(occ_xy)
++n_pres <- sum(resp == 1L, na.rm = TRUE)
+ 
+ set_status(paste0("BUILDING MODEL OPTIONS (p=", p_env, ", n=", n_pres, ")"))
+ 
+@@ -644,13 +665,53 @@ built_opts <- bmopt_build(
+ bmopt_report(built_opts, file.path(cfg$out_dir, "modeling_options_applied.csv"),
+              data_type = "binary", p = p_env, n = n_pres)
+ 
++# ---- Mekansal blok CV tablosu (v1.2) ----
++# biomod2'nin "block" stratejisi ENMeval paketini gerektirir. Ayni duzen
++# (Muscarella et al. 2014: varliklar boylam medyaniyla ikiye, her yari enlem
++# medyaniyla ikiye bolunur; diger noktalar ayni sinirlarla atanir) burada
++# yeniden kurulur ve "user.defined" olarak verilir.
++block4_assign <- function(xy_p, xy_o) {
++  lon <- stats::median(xy_p[, 1])
++  gp <- integer(nrow(xy_p)); go <- integer(nrow(xy_o))
++  for (side in 0:1) {
++    ip <- if (side == 0) xy_p[, 1] <= lon else xy_p[, 1] > lon
++    io <- if (side == 0) xy_o[, 1] <= lon else xy_o[, 1] > lon
++    lat <- stats::median(xy_p[ip, 2])
++    gp[ip] <- side * 2 + ifelse(xy_p[ip, 2] <= lat, 1L, 2L)
++    go[io] <- side * 2 + ifelse(xy_o[io, 2] <= lat, 1L, 2L)
++  }
++  list(p = gp, o = go)
++}
++block_cv_table <- function(bf) {
++  sp <- bf@data.species; sp[is.na(sp)] <- 0
++  xy <- as.matrix(bf@coord)
++  pa_tab <- tryCatch(bf@PA.table, error = function(e) NULL)
++  if (is.null(pa_tab) || ncol(pa_tab) == 0) pa_tab <- data.frame(PA1 = rep(TRUE, length(sp)))
++  out <- NULL
++  for (pa in seq_len(ncol(pa_tab))) {
++    ind <- which(pa_tab[, pa] == TRUE)
++    s <- sp[ind]; b <- block4_assign(xy[ind[s == 1], , drop = FALSE], xy[ind[s == 0], , drop = FALSE])
++    m <- matrix(NA, nrow = length(sp), ncol = 4)
++    for (k in 1:4) { m[ind[s == 1], k] <- b$p != k; m[ind[s == 0], k] <- b$o != k }
++    colnames(m) <- if (inherits(bf, "BIOMOD.formated.data.PA")) paste0("_PA", pa, "_RUN", 1:4) else paste0("_allData_RUN", 1:4)
++    out <- cbind(out, m)
++  }
++  out
++}
++cv_user_table <- NULL
++if (cv_strategy == "block") {
++  cv_user_table <- block_cv_table(biomod_data)
++  message("Spatial block CV: 4 blocks x ", ncol(cv_user_table) / 4, " PA set(s)")
++}
++
+ mod_args <- list(
+   bm.format   = biomod_data,
+   modeling.id = "binary",
+   models      = models_to_run,
+-  CV.strategy = "kfold",
+-  CV.k        = 10,
+-  CV.nb.rep   = cv_rep,
++  CV.strategy = if (cv_strategy == "block") "user.defined" else cv_strategy,
++  CV.user.table = cv_user_table,
++  CV.k        = cv_k,
++  CV.nb.rep   = if (cv_strategy == "block") 1L else cv_rep,
+   metric.eval = c("AUCroc", "TSS", "BOYCE"),
+   var.import  = 3,
+   prevalence  = 0.5,        # Barbet-Massin et al. (2012): varlik/yokluk esit agirlik
+-- 
+2.43.0
+

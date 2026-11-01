@@ -1,0 +1,8 @@
+"component","mean_share","sd_share"
+"algo",0.7633,0.2788
+"gcm",0.0589,0.1008
+"ssp",0.0619,0.1063
+"algo:gcm",0.0183,0.0216
+"algo:ssp",0.0202,0.025
+"gcm:ssp",0.0554,0.0827
+"Residuals",0.022,0.0249

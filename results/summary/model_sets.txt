@@ -1,0 +1,3 @@
+M1: gsp
+M2: gsp, insol_spr, tpi100
+M3: soil_phh2o, canopy_cover, gsp, soil_bdod, soil_clay, soil_cec, soil_cfvo, insol_spr, tpi100
